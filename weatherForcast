@@ -1,0 +1,84 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(19, 23, 18, 17, 16, 15);
+
+const char* ssid     = "Petrickovic";
+const char* password = "53ckovic";
+
+String latitude  = "43.62";
+String longitude = "20.90";
+
+unsigned long lastCheck = 0;
+const long interval = 600000;
+
+void fetchWeather() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    String url = "http://api.open-meteo.com/v1/forecast?latitude=" + latitude + "&longitude=" + longitude + "&current_weather=true";
+    
+    http.begin(url);
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      String payload = http.getString();
+      
+      int currentWeatherIndex = payload.indexOf("\"current_weather\":");
+      if (currentWeatherIndex != -1) {
+        int tempIndex = payload.indexOf("\"temperature\":", currentWeatherIndex);
+        if (tempIndex != -1) {
+          int start = payload.indexOf(":", tempIndex) + 1;
+          int end = payload.indexOf(",", start);
+          if (end == -1) end = payload.indexOf("}", start);
+          
+          String tempStr = payload.substring(start, end);
+          tempStr.trim();
+          
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("Vrnjacka Banja");
+          
+          lcd.setCursor(0, 1);
+          lcd.print("Temp: " + tempStr + " C");
+        }
+      }
+    } else {
+      lcd.clear();
+      lcd.print("Greska na mrezi");
+    }
+    http.end();
+  } else {
+    lcd.clear();
+    lcd.print("Nema Wi-Fi veze");
+  }
+}
+
+void setup() {
+  lcd.begin(16, 2);
+  lcd.print("Spajanje Wi-Fi..");
+
+  WiFi.begin(ssid, password);
+  int attempt = 0;
+  while (WiFi.status() != WL_CONNECTED && attempt < 20) {
+    delay(500);
+    attempt++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    lcd.clear();
+    lcd.print("Povezano!");
+    delay(1000);
+    fetchWeather();
+  } else {
+    lcd.clear();
+    lcd.print("Greska: Wi-Fi!");
+  }
+}
+
+void loop() {
+  if (millis() - lastCheck >= interval) {
+    lastCheck = millis();
+    fetchWeather();
+  }
+}
